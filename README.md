@@ -1,70 +1,95 @@
-# Getting Started with Create React App
+# Docker Images Auf Github und DockerHub pushen
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+![Main Image](./ReadMeAssets/David.png)
+## 1. Einleitung 
+Die ist eine kleine Aufgabe, welche wir im Modul M325 erhalten haben. Die Aufgabe bestand darin, ein einfaches React Projekt auf Dockerhub und Github automatisch mit einer GitHub acction zu pushen. Das React Projekt dahinter selbst spielt nicht wirklich eine Rolle.
 
-## Available Scripts
 
-In the project directory, you can run:
 
-### `npm start`
+## 2. Dockerfile
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+Zuerst muss das React Projekt gebaut werden, um in einem Docker Image zu speichern. Dies wird mit dem Folgendem Dockerfile erreicht:
 
-### `npm test`
+```dockerfile
+FROM node:20-alpine AS build
+ENV NODE_ENV development
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+WORKDIR /app
+COPY . .
 
-### `npm run build`
+RUN npm ci
+RUN npm run build
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+FROM nginx:1.21-alpine as prod
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+COPY --from=build /app/build /usr/share/nginx/html
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+EXPOSE 80
 
-### `npm run eject`
+```
+## 3 Remote Push
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+### 3.1 Auf Docker Hub
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+Ich habe damit begonnen zu versuchen das Docker Image zuerst auf Docker Hub zu pushen. Dafür musste ich zuerst auf Github selbst im Repository für `secrets.DOCKER_HUB_USERNAME` und `secrets.DOCKER_HUB_PASSWORD` meine Respektiven daten angeben, sodass ich meine Secrets nicht Hardcoden muss. Falls sie selbst das ausprobieren wollen, müssen sie auf Github selbst unter den Repository settings in den Enviroment Variables und darin in den Actions diese beiden Env Secrets angeben und abspeichern. Der folgende Teil vom .yml file ist für das pushen auf Dockerhub nötig:
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+```yml
+jobs:
+  publish-docker-image:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
 
-## Learn More
+      - name: Login to DockerHub
+        uses: docker/login-action@v1
+        with:
+          username: ${{ secrets.DOCKER_HUB_USERNAME }}
+          password: ${{ secrets.DOCKER_HUB_PASSWORD }}
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+      - name: Publish Docker image to Docker Hub
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          push: true
+          tags: ${{ secrets.DOCKER_HUB_USERNAME }}/ref-card-02:${{ github.sha }}
+```
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+Das Resultat auf Dockerhub sollte ungefähr so auf Dockerhub aussehen:
 
-### Code Splitting
+![Dockerhub](./ReadMeAssets/dockerhub.png)
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+Hier ist das ganze auf [DockerHub](https://hub.docker.com/repository/docker/danithaboss/ref-card-02/general)
 
-### Analyzing the Bundle Size
+### 3.2 Auf Github Packages
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
+Um das Image auf Github selbst zu pushen benötigt man etwas mehr als nur die Login Daten. In meinem yml file wird der username direkt vom Repository genommen, sodass man nicht extra etwas hinzufügen muss. Jedoch wird ein Github acces Token als `secrets.GITHUBTOKEN` gespeichert. Um diesen Zu erhalten muss man auf den eigenen Profileinstellungen einen neuen Token erstellen und zwar mit `write:packages` Rechten, sodass ein Pacakge auch erstellt werden kann. 
+`        run: docker tag ${{ secrets.DOCKER_HUB_USERNAME }}/ref-card-02:${{ github.sha }} ghcr.io/danidevofficial/ref-card-02:${{ github.sha }}
+`
 
-### Making a Progressive Web App
+Hier müsste für personalisierung die Namen etc abgeändert werden. 
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
+Das ganze yml file für GitHub solte ungefär so aussehen:
 
-### Advanced Configuration
+```yml
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v1
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUBTOKEN }}
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
+      - name: Tag Docker image for GitHub Container Registry
+        run: docker tag ${{ secrets.DOCKER_HUB_USERNAME }}/ref-card-02:${{ github.sha }} ghcr.io/danidevofficial/ref-card-02:${{ github.sha }}
 
-### Deployment
+      - name: Push Docker image to GitHub Container Registry
+        run: docker push ghcr.io/danidevofficial/ref-card-02:${{ github.sha }}
+```
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
+Auf Github sollte das unter dem eigenem Account in denn Packages ungefär so aussehen:
 
-### `npm run build` fails to minify
+![GitHub Image](./ReadMeAssets/Github.png)
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+[Oder selbst anschauen](https://github.com/users/DaniDevOfficial/packages/container/ref-card-02)
