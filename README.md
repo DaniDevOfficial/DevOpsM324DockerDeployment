@@ -8,7 +8,6 @@ Die ist eine kleine Aufgabe, welche wir im Modul M325 erhalten haben. Die Aufgab
 
 ## 2. Dockerfile
 
-
 Zuerst muss das React Projekt gebaut werden, um in einem Docker Image zu speichern. Dies wird mit dem Folgendem Dockerfile erreicht:
 
 ```dockerfile
