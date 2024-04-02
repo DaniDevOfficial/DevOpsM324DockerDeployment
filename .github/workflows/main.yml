@@ -1,39 +1,39 @@
-name: publish-docker-image
+name: deploy-on-aws
 
 on:
   push:
-    branches:
-      - main
+    tags:
+      - "v*.*.*"
 
 jobs:
-  publish-docker-image:
+  deploy-on-aws:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout
-        uses: actions/checkout@v2
+      - name: Checkout code
+        uses: actions/checkout@v2 
 
-      - name: Login to DockerHub
-        uses: docker/login-action@v1
-        with:
-          username: ${{ secrets.DOCKER_HUB_USERNAME }}
-          password: ${{ secrets.DOCKER_HUB_PASSWORD }}
+      - name: Login to Amazon ECR
+        id: login-ecr 
+        uses: aws-actions/amazon-ecr-login@v2
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+          AWS_SESSION_TOKEN: ${{ secrets.AWS_SESSION_TOKEN }}
 
-      - name: Publish Docker image to Docker Hub
-        uses: docker/build-push-action@v2
-        with:
-          context: .
-          push: true
-          tags: ${{ secrets.DOCKER_HUB_USERNAME }}/ref-card-02:${{ github.sha }}
+      - name: Extract Git Tag
+        id: extract_tag
+        run: echo "::set-output name=TAG::$(echo ${GITHUB_REF#refs/tags/})"
 
-      - name: Login to GitHub Container Registry
-        uses: docker/login-action@v1
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUBTOKEN }}
-
-      - name: Tag Docker image for GitHub Container Registry
-        run: docker tag ${{ secrets.DOCKER_HUB_USERNAME }}/ref-card-02:${{ github.sha }} ghcr.io/danidevofficial/ref-card-02:${{ github.sha }}
-
-      - name: Push Docker image to GitHub Container Registry
-        run: docker push ghcr.io/danidevofficial/ref-card-02:${{ github.sha }}
+      - name: Build, tag, and push image to Amazon ECR
+        id: build-image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: 324-devops-refcard-03
+          IMAGE_TAG: ${{ steps.extract_tag.outputs.TAG }}
+        run: |
+          # Build a docker container and push it to ECR
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          echo "::set-output name=image::$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
