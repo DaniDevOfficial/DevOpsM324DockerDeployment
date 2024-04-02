@@ -21,6 +21,10 @@ function App() {
         >
           Checkout my Github
         </a>
+
+        <a>
+          I love la gyato
+        </a>
       </header>
     </div>
   );
