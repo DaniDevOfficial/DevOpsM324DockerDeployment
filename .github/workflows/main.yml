@@ -30,7 +30,7 @@ jobs:
         id: build-image
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          ECR_REPOSITORY: 324-devops-refcard-03
+          ECR_REPOSITORY: m324deployment
           IMAGE_TAG: ${{ steps.extract_tag.outputs.TAG }}
         run: |
           # Build a docker container and push it to ECR
