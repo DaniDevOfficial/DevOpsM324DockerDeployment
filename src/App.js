@@ -11,7 +11,7 @@ function App() {
           Welcome to React App with Docker and Github Acctions
         </p>
         <p>
-          This should be deployed to AWS EC2 instance using Github Actions
+          This should be deployed to AWS using Github Actions
         </p>
         <a
           className="App-link"
